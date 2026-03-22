@@ -786,3 +786,591 @@ else:
     if patience_counter >= patience:
         break  # Stop training
 ```
+
+**Our code uses patience=15** — stop if no improvement for 15 epochs.
+
+---
+
+## Learning Rate Scheduling
+
+Reduce learning rate as training progresses.
+
+### Step Decay
+Multiply LR by factor every N epochs.
+```
+Epochs 1-30:  lr = 0.001
+Epochs 31-60: lr = 0.0005
+Epochs 61-90: lr = 0.00025
+```
+
+### Cosine Annealing
+Smoothly decrease LR following a cosine curve.
+```
+lr(t) = lr_min + 0.5 × (lr_max - lr_min) × (1 + cos(π × t / T))
+```
+
+### ReduceLROnPlateau (What we use)
+Reduce LR when a metric stops improving.
+
+**Our code:**
+```python
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
+# If loss doesn't improve for 5 epochs, multiply LR by 0.5
+```
+
+---
+
+## Hyperparameter Tuning
+
+### Grid Search
+Try every combination.
+```
+lr:       [0.001, 0.01, 0.1]
+dropout:  [0.2, 0.3, 0.4]
+layers:   [[128], [128, 64], [128, 64, 32]]
+
+Total: 3 × 3 × 3 = 27 combinations
+```
+**Pros:** Thorough. **Cons:** Exponential explosion, expensive.
+
+### Random Search
+Randomly sample combinations. Often finds good results faster than grid search.
+
+### Bayesian Optimization (Optuna) — What we use
+
+Intelligently explores the search space:
+1. Train a few random configurations
+2. Build a probabilistic model of which regions are promising
+3. Sample next configuration from promising regions
+4. Update model, repeat
+
+**Our `auto_optimize.py` uses Optuna:**
+```python
+study = optuna.create_study(
+    direction="maximize",
+    pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3),
+)
+study.optimize(objective, n_trials=200)
+```
+
+**Pruning:** Optuna can stop bad trials early. If a trial is performing below median after 3 epochs, kill it.
+
+---
+
+## Data Preprocessing
+
+### Standardization (Z-score normalization)
+```
+x_scaled = (x - mean) / std
+
+Result: mean=0, std=1
+```
+**Use for:** Most neural networks (what we use).
+
+### Min-Max Normalization
+```
+x_scaled = (x - min) / (max - min)
+
+Result: range [0, 1]
+```
+**Use for:** When you need bounded values.
+
+**Our code:**
+```python
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)  # Fit on train only!
+X_test = scaler.transform(X_test)        # Apply same transform to test
+```
+
+**Critical:** Fit the scaler on training data only. If you fit on all data, you leak test information.
+
+---
+
+## Class Imbalance
+
+When some classes are much more common than others.
+
+**Our data:**
+```
+SELL:    7,234 samples
+NEUTRAL: 8,891 samples
+BUY:     6,468 samples
+```
+Fairly balanced, but not perfect.
+
+### Solutions:
+
+**Weighted Loss:** Penalize mistakes on rare classes more.
+```python
+class_weights = 1.0 / class_counts  # Inverse frequency
+criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights))
+```
+
+**Oversampling:** Duplicate minority class samples.
+
+**SMOTE:** Generate synthetic minority samples by interpolating between existing ones.
+
+**Our code uses weighted loss** — see `train.py`:
+```python
+class_weights = 1.0 / (class_counts + 1)
+class_weights = class_weights / class_weights.sum() * 3
+```
+
+---
+
+## Cross-Validation
+
+Instead of a single train/test split, train multiple times on different splits.
+
+### K-Fold Cross-Validation
+```
+Fold 1: [Test] [Train] [Train] [Train] [Train]
+Fold 2: [Train] [Test] [Train] [Train] [Train]
+Fold 3: [Train] [Train] [Test] [Train] [Train]
+Fold 4: [Train] [Train] [Train] [Test] [Train]
+Fold 5: [Train] [Train] [Train] [Train] [Test]
+
+Final score = average of 5 folds
+```
+
+### Time-Series Split (for sequential data)
+```
+Fold 1: [Train] [Test]
+Fold 2: [Train] [Train] [Test]
+Fold 3: [Train] [Train] [Train] [Test]
+```
+Never train on future data.
+
+**We use time-ordered split** (last 20% is test) but not full k-fold CV — it's expensive for neural nets.
+
+---
+
+# Part 5: Types of Neural Networks (Advanced)
+
+## MLP (Multi-Layer Perceptron) — What We're Using
+
+```
+Input → Dense → Dense → Dense → Output
+        ↓       ↓       ↓
+     [ReLU]  [ReLU]  [Softmax]
+```
+
+**Good for:**
+- Tabular data (spreadsheet-like)
+- When features are independent
+- When order doesn't matter
+
+**Our use case:** 24 technical indicators → 3 classes (BUY/SELL/NEUTRAL)
+
+**Limitations:** Treats each row independently. Doesn't know that yesterday's RSI relates to today's RSI.
+
+---
+
+## CNN (Convolutional Neural Network)
+
+```
+Image → [Conv] → [Pool] → [Conv] → [Pool] → [Dense] → Output
+        detect   reduce    detect   reduce   classify
+        edges    size      shapes   size
+```
+
+**Key idea:** Local connectivity + weight sharing. A 3×3 filter slides across the image, detecting patterns anywhere they appear.
+
+**Good for:**
+- Images
+- Any data with spatial structure
+- Time series (1D convolution)
+
+**Example architecture (image classification):**
+```
+Input: 224×224×3 (RGB image)
+Conv1: 64 filters, 3×3 → 224×224×64
+Pool1: 2×2 max pooling → 112×112×64
+Conv2: 128 filters, 3×3 → 112×112×128
+Pool2: 2×2 max pooling → 56×56×128
+...
+Flatten → Dense → Softmax → 1000 classes
+```
+
+---
+
+## RNN / LSTM (Recurrent Neural Networks)
+
+```
+Time step 1:  x₁ → [RNN] → h₁ (hidden state)
+                     ↓
+Time step 2:  x₂ → [RNN] → h₂ (receives h₁)
+                     ↓
+Time step 3:  x₃ → [RNN] → h₃ (receives h₂)
+                     ↓
+                  Output
+```
+
+**Key idea:** Memory. The hidden state carries information from previous timesteps.
+
+**LSTM (Long Short-Term Memory):** Solves the vanishing gradient problem in RNNs with "gates" that control information flow.
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    LSTM Cell                         │
+│                                                      │
+│  [Forget Gate] — what to discard from memory        │
+│  [Input Gate]  — what new information to store      │
+│  [Output Gate] — what to output from memory         │
+│                                                      │
+│  Cell State (long-term memory) ─────────────────→   │
+│  Hidden State (short-term memory) ───────────────→  │
+└─────────────────────────────────────────────────────┘
+```
+
+**Good for:**
+- Time series (stock prices!)
+- Sequences (text, audio)
+- Variable-length inputs
+
+**Why we should use this:** Stock data IS a time series. Today's RSI of 65 means something different if yesterday was 30 (recovering) vs 80 (declining). An LSTM would capture this.
+
+---
+
+## Transformers
+
+**Key idea:** Attention mechanism — let every element in a sequence attend to every other element.
+
+```
+"The cat sat on the mat"
+   ↓    ↓   ↓  ↓   ↓   ↓
+   Each word attends to all other words
+   "cat" attends strongly to "sat" and "mat"
+```
+
+**Architecture:**
+```
+Input → [Embedding] → [Self-Attention] → [Feed-Forward] → ... → Output
+                           ↑
+                     Multi-head attention:
+                     Q (query), K (key), V (value)
+                     Attention(Q,K,V) = softmax(QK^T / √d) × V
+```
+
+**Why transformers dominate:**
+- Parallelizable (unlike RNNs)
+- Can attend to any position (long-range dependencies)
+- Scale incredibly well with data and parameters
+
+**GPT, BERT, Claude:** All transformer-based.
+
+**For stock data:** Transformers could capture long-range patterns (what happened 20 days ago might matter), but need lots of data.
+
+---
+
+## GANs (Generative Adversarial Networks)
+
+Two networks fighting each other:
+
+```
+Generator: Random noise → Fake images
+                ↓
+Discriminator: Real or Fake? ← Real images
+                ↓
+Generator improves to fool Discriminator
+Discriminator improves to catch Generator
+```
+
+**Good for:**
+- Image generation
+- Data augmentation
+- Style transfer
+
+---
+
+## Autoencoders
+
+Compress data, then reconstruct it.
+
+```
+Input → [Encoder] → Compressed representation → [Decoder] → Reconstruction
+ 784        128                10                  128          784
+(image)                    (bottleneck)                      (image)
+```
+
+**Good for:**
+- Dimensionality reduction
+- Anomaly detection (bad reconstructions = anomalies)
+- Feature learning
+
+---
+
+## When to Use Each Type
+
+| Data Type | Network Type | Why |
+|-----------|--------------|-----|
+| Tabular (spreadsheet) | MLP | No spatial/temporal structure |
+| Images | CNN | Spatial patterns, local features |
+| Time series | LSTM/Transformer | Sequential dependencies |
+| Text | Transformer | Long-range dependencies, attention |
+| Generation | GAN/VAE | Adversarial or probabilistic generation |
+| Anomaly detection | Autoencoder | Learn "normal," flag outliers |
+
+**Our situation:** We're using MLP on what is really time-series data. This is a fundamental limitation.
+
+---
+
+# Part 6: Our System — Current Limitations & Next Steps
+
+## Current Architecture (train.py)
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                         DirectionNet                               │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Input: 24 technical indicators                                   │
+│     ↓                                                              │
+│  [Linear 24→128] → [BatchNorm] → [ReLU] → [Dropout 0.3]          │
+│     ↓                                                              │
+│  [Linear 128→64] → [BatchNorm] → [ReLU] → [Dropout 0.3]          │
+│     ↓                                                              │
+│  [Linear 64→32]  → [BatchNorm] → [ReLU] → [Dropout 0.3]          │
+│     ↓                                                              │
+│  [Linear 32→3] → (Softmax via CrossEntropyLoss)                   │
+│     ↓                                                              │
+│  Output: [P(SELL), P(NEUTRAL), P(BUY)]                            │
+│                                                                    │
+│  Total parameters: ~13,600                                        │
+│  Training samples: 22,593 across 50 tickers                       │
+│  Test accuracy: ~40% (random baseline: 33%)                       │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+## Current Performance
+
+```
+Model           | Accuracy | vs Random
+----------------|----------|----------
+Random Baseline | 33%      | —
+Neural Net      | 40%      | +7%
+Random Forest   | 41%      | +8%
+XGBoost         | 39%      | +6%
+LightGBM        | 40%      | +7%
+```
+
+**Observation:** Tree-based models roughly match the neural net. This suggests the bottleneck is NOT the model architecture — it's the data and features.
+
+---
+
+## Limitation 1: Not Enough Data
+
+**Problem:** 22,593 samples across 50 tickers. Deep learning typically needs 100K+ samples to really shine.
+
+**Why it matters:**
+- With limited data, neural nets overfit easily
+- Can't learn complex patterns reliably
+- Tree models are more data-efficient
+
+**Fix:** Add more tickers, use longer history, include intraday data.
+
+```python
+# Current (fetch_data.py)
+TICKERS = [...50 tickers...]
+period = "2y"
+
+# Better
+TICKERS = [...200+ tickers...]
+period = "5y"
+# Or switch to hourly data: interval="1h"
+```
+
+---
+
+## Limitation 2: Daily Data Only
+
+**Problem:** We're using daily bars. By the time we see today's close, the opportunity may be gone.
+
+**Missing patterns:**
+- Intraday momentum (first hour predicts the day?)
+- Overnight gaps
+- Volume patterns within the day
+
+**Fix:** Use hourly data (yfinance supports `interval="1h"` for last 730 days).
+
+---
+
+## Limitation 3: No Sequence Modeling
+
+**Problem:** We treat each data point independently. The model sees today's RSI=65 but doesn't know if it was 30 yesterday (recovering) or 80 (declining).
+
+```
+Current: Each row is independent
+─────────────────────────────────────────────
+Day 1: RSI=30, MACD=-2, ... → PREDICT
+Day 2: RSI=45, MACD=-1, ... → PREDICT (no memory of Day 1)
+Day 3: RSI=65, MACD=0.5, ... → PREDICT (no memory of Days 1-2)
+```
+
+**Fix:** Use LSTM or Transformer.
+
+```python
+# Instead of DirectionNet (MLP), use:
+class DirectionLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=2):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, 3)
+    
+    def forward(self, x):
+        # x shape: (batch, sequence_length, features)
+        lstm_out, _ = self.lstm(x)
+        # Use last timestep's output
+        return self.fc(lstm_out[:, -1, :])
+```
+
+**Data reshaping needed:** Instead of single rows, create sequences.
+```
+Input to LSTM: last 20 days of indicators → predict tomorrow
+Shape: (batch_size, 20, 24)
+```
+
+---
+
+## Limitation 4: No Market Regime Awareness
+
+**Problem:** The model doesn't know if we're in a bull market, bear market, or sideways chop. The same RSI=30 means different things in different regimes.
+
+**Fix:** Add market regime features:
+```python
+# In fetch_data.py, add:
+df["spy_trend"] = spy_sma50 > spy_sma200  # Bull/bear
+df["vix_level"] = vix_close               # Fear gauge
+df["spy_momentum"] = spy_return_20d       # Market momentum
+```
+
+---
+
+## Limitation 5: No Cross-Asset Features
+
+**Problem:** Stocks don't move in isolation. If SPY drops 2%, most stocks follow. We ignore this.
+
+**Fix:** Include market-wide features:
+```python
+# Fetch SPY, VIX, TLT (bonds) alongside each ticker
+# Add as features:
+"spy_return_1d", "vix_level", "vix_change", "tlt_return_1d"
+```
+
+---
+
+## Limitation 6: Limited Feature Set
+
+**What we have:** 24 technical indicators (RSI, MACD, Bollinger, etc.)
+
+**What we're missing:**
+- Volume profile (price levels with high volume)
+- Options flow (unusual activity suggests informed trading)
+- Sentiment (news, social media)
+- Sector relative strength
+- Earnings proximity
+
+---
+
+## Limitation 7: Threshold Tuning
+
+**Current:** BUY if future_return > 0.5%, SELL if < -0.5%
+
+**Problem:** Is 0.5% the right threshold?
+- Too tight: More signals, but noisier
+- Too loose: Fewer signals, but more confident
+
+**Fix:** Try different thresholds or make it a hyperparameter:
+```python
+threshold = trial.suggest_float("threshold", 0.003, 0.015)
+```
+
+---
+
+## Limitation 8: Single-Day Target
+
+**Current:** Predict tomorrow's direction.
+
+**Problem:** Day-to-day noise is high. Might have better signal on longer horizons.
+
+**Fix:** Try multiple horizons:
+```python
+df["label_1d"] = create_labels(df, forward_days=1)
+df["label_3d"] = create_labels(df, forward_days=3)
+df["label_5d"] = create_labels(df, forward_days=5)
+```
+
+---
+
+## Recommended Next Steps (Priority Order)
+
+### 1. Add Sequence Modeling (LSTM)
+**Effort:** Medium | **Impact:** High
+
+This is the biggest architectural gap. Stock data is sequential — we should treat it that way.
+
+### 2. Add Market Regime Features
+**Effort:** Low | **Impact:** Medium
+
+Quick win. Fetch SPY/VIX alongside tickers, add as features.
+
+### 3. Scale Up Data
+**Effort:** Low | **Impact:** Medium
+
+Add more tickers (200+), extend history to 5 years.
+
+### 4. Try Hourly Data
+**Effort:** Medium | **Impact:** High
+
+Intraday patterns might be stronger. More data points per ticker.
+
+### 5. Multi-Horizon Targets
+**Effort:** Low | **Impact:** Medium
+
+Train separate models for 1-day, 3-day, 5-day predictions. See which has more signal.
+
+### 6. Ensemble Methods
+**Effort:** Medium | **Impact:** Medium
+
+Combine neural net predictions with tree model predictions. Often beats either alone.
+
+---
+
+## Code Reference
+
+| File | Purpose |
+|------|---------|
+| `fetch_data.py` | Downloads OHLCV, computes 24 technical indicators, creates labels |
+| `train.py` | Defines DirectionNet, training loop, saves history for dashboard |
+| `auto_optimize.py` | Bayesian hyperparameter search with Optuna, compares to tree baselines |
+| `app.py` | Streamlit dashboard for visualization |
+
+---
+
+## Summary: The Path Forward
+
+```
+Current State (40% accuracy, +7% vs random):
+┌──────────────────────────────────────────────────────────────────┐
+│  MLP on daily data, no sequence modeling, limited features      │
+└──────────────────────────────────────────────────────────────────┘
+
+Target State (aim for 50%+ accuracy):
+┌──────────────────────────────────────────────────────────────────┐
+│  LSTM on hourly data, market regime features, 200+ tickers,     │
+│  multiple horizons, ensemble with tree models                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+The neural network architecture is sound. The bottleneck is:
+1. **Data structure:** Not using sequences
+2. **Data quantity:** Need more samples
+3. **Data quality:** Missing important features (market regime, cross-asset)
+4. **Signal-to-noise:** Daily moves are noisy; intraday or longer horizons might help
+
+The tree models matching neural net performance is actually informative — it tells us the issue isn't model expressiveness, it's the features and data representation.
+
+---
+
+*Guide created for the neural-net project. See the live dashboard at `python -m streamlit run app.py`.*
