@@ -86,6 +86,9 @@ class FlexNet(nn.Module):
         return self.net(x)
 
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def train_trial(trial: Trial, X_train, X_test, y_train, y_test, n_features, study_id):
     """Single training trial with Optuna-suggested hyperparameters."""
 
@@ -104,21 +107,21 @@ def train_trial(trial: Trial, X_train, X_test, y_train, y_test, n_features, stud
     epochs = 20  # Aggressive — early stopping catches the rest
 
     # ── Build model ──
-    model = FlexNet(n_features, hidden_sizes, dropout, activation)
+    model = FlexNet(n_features, hidden_sizes, dropout, activation).to(DEVICE)
 
     # Class weights
     class_counts = np.bincount(y_train.astype(int), minlength=3)
     class_weights = 1.0 / (class_counts + 1)
     class_weights = class_weights / class_weights.sum() * 3
-    weights_tensor = torch.FloatTensor(class_weights)
+    weights_tensor = torch.FloatTensor(class_weights).to(DEVICE)
 
     criterion = nn.CrossEntropyLoss(weight=weights_tensor)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    X_train_t = torch.FloatTensor(X_train)
-    y_train_t = torch.LongTensor(y_train.astype(int))
-    X_test_t = torch.FloatTensor(X_test)
-    y_test_t = torch.LongTensor(y_test.astype(int))
+    X_train_t = torch.FloatTensor(X_train).to(DEVICE)
+    y_train_t = torch.LongTensor(y_train.astype(int)).to(DEVICE)
+    X_test_t = torch.FloatTensor(X_test).to(DEVICE)
+    y_test_t = torch.LongTensor(y_test.astype(int)).to(DEVICE)
 
     train_loader = DataLoader(
         TensorDataset(X_train_t, y_train_t),
@@ -132,6 +135,7 @@ def train_trial(trial: Trial, X_train, X_test, y_train, y_test, n_features, stud
     for epoch in range(epochs):
         model.train()
         for batch_X, batch_y in train_loader:
+            batch_X, batch_y = batch_X.to(DEVICE), batch_y.to(DEVICE)
             optimizer.zero_grad()
             loss = criterion(model(batch_X), batch_y)
             loss.backward()
@@ -140,8 +144,8 @@ def train_trial(trial: Trial, X_train, X_test, y_train, y_test, n_features, stud
         # Evaluate
         model.eval()
         with torch.no_grad():
-            preds = model(X_test_t).argmax(1).numpy()
-            acc = accuracy_score(y_test_t.numpy(), preds)
+            preds = model(X_test_t).argmax(1).cpu().numpy()
+            acc = accuracy_score(y_test_t.cpu().numpy(), preds)
 
         if acc > best_acc:
             best_acc = acc
@@ -216,6 +220,7 @@ def run_optimization(n_trials=200, study_id=None):
 
     print(f"🧬 Auto-Optimizer — {n_trials} trials")
     print(f"   Study ID: {study_id}")
+    print(f"   Device: {DEVICE}" + (f" ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else ""))
     print("=" * 50)
 
     # Load data once
@@ -308,26 +313,27 @@ def run_optimization(n_trials=200, study_id=None):
     n_layers = best["n_layers"]
     hidden_sizes = [best[f"hidden_{i}"] for i in range(n_layers)]
 
-    model = FlexNet(n_features, hidden_sizes, best["dropout"], best["activation"])
+    model = FlexNet(n_features, hidden_sizes, best["dropout"], best["activation"]).to(DEVICE)
     weights_tensor = torch.FloatTensor([1.0, 1.0, 1.0])
     class_counts = np.bincount(y_train.astype(int), minlength=3)
     class_weights = 1.0 / (class_counts + 1)
     class_weights = class_weights / class_weights.sum() * 3
-    weights_tensor = torch.FloatTensor(class_weights)
+    weights_tensor = torch.FloatTensor(class_weights).to(DEVICE)
 
     criterion = nn.CrossEntropyLoss(weight=weights_tensor)
     optimizer = optim.Adam(model.parameters(), lr=best["lr"], weight_decay=best["weight_decay"])
 
-    X_train_t = torch.FloatTensor(X_train)
-    y_train_t = torch.LongTensor(y_train.astype(int))
-    X_test_t = torch.FloatTensor(X_test)
-    y_test_t = torch.LongTensor(y_test.astype(int))
+    X_train_t = torch.FloatTensor(X_train).to(DEVICE)
+    y_train_t = torch.LongTensor(y_train.astype(int)).to(DEVICE)
+    X_test_t = torch.FloatTensor(X_test).to(DEVICE)
+    y_test_t = torch.LongTensor(y_test.astype(int)).to(DEVICE)
     train_loader = DataLoader(TensorDataset(X_train_t, y_train_t), batch_size=best["batch_size"], shuffle=True)
 
     best_acc = 0
     for epoch in range(60):
         model.train()
         for bx, by in train_loader:
+            bx, by = bx.to(DEVICE), by.to(DEVICE)
             optimizer.zero_grad()
             criterion(model(bx), by).backward()
             optimizer.step()
