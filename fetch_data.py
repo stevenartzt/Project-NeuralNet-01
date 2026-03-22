@@ -153,6 +153,15 @@ def fetch_ticker(ticker, period="2y", interval="1d"):
         # Flatten multi-level columns if present
         if hasattr(data.columns, 'levels'):
             data.columns = [c[0] if isinstance(c, tuple) else c for c in data.columns]
+        # Normalize date column name (yfinance uses "Datetime" for intraday)
+        if "Datetime" in data.columns and "Date" not in data.columns:
+            data = data.rename(columns={"Datetime": "Date"})
+        if "Date" not in data.columns:
+            # Date might still be in index after reset
+            for col in data.columns:
+                if "date" in str(col).lower() or "time" in str(col).lower():
+                    data = data.rename(columns={col: "Date"})
+                    break
         data["ticker"] = ticker
         return data
     except Exception as e:
@@ -193,10 +202,13 @@ def fetch_all(tickers=None, period="2y"):
     combined.to_csv(out_path, index=False)
 
     # Save metadata
+    date_range = ["unknown", "unknown"]
+    if "Date" in combined.columns:
+        date_range = [str(combined["Date"].min()), str(combined["Date"].max())]
     meta = {
         "tickers": tickers,
         "total_rows": len(combined),
-        "date_range": [str(combined["Date"].min()), str(combined["Date"].max())],
+        "date_range": date_range,
         "features": indicator_cols,
         "label_distribution": combined["label"].value_counts().to_dict(),
         "fetched_at": datetime.now().isoformat(),
