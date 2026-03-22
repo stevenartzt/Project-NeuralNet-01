@@ -1241,4 +1241,11 @@ def api_inference(run_id):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5005, debug=False)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="127.0.0.1", help="Host (use 0.0.0.0 for LAN access)")
+    parser.add_argument("--port", type=int, default=5005)
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args()
+    print(f"🧠 Neural Net Dashboard → http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=args.debug)
