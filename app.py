@@ -5,6 +5,7 @@ Port 5005 → artzt.cloud/neural
 """
 
 import os
+import sys
 import json
 import glob
 import subprocess
@@ -1051,11 +1052,8 @@ def api_train():
     data_path = os.path.join(DATA_DIR, "training_data.csv")
     if not os.path.exists(data_path):
         # Fetch data first
-        venv_py = os.path.join(os.path.dirname(BASE_DIR), ".venv", "bin", "python3")
-        if not os.path.exists(venv_py):
-            venv_py = "python3"
         fetch_proc = subprocess.Popen(
-            [venv_py, os.path.join(BASE_DIR, "fetch_data.py")],
+            [sys.executable, os.path.join(BASE_DIR, "fetch_data.py")],
             cwd=BASE_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT
@@ -1066,11 +1064,8 @@ def api_train():
     train_env = os.environ.copy()
     train_env["RUN_ID"] = run_id
     train_env["EPOCHS"] = "50"
-    venv_python = os.path.join(os.path.dirname(BASE_DIR), ".venv", "bin", "python3")
-    if not os.path.exists(venv_python):
-        venv_python = "python3"
     proc = subprocess.Popen(
-        [venv_python, "-u", os.path.join(BASE_DIR, "train.py")],
+        [sys.executable, "-u", os.path.join(BASE_DIR, "train.py")],
         cwd=BASE_DIR,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -1111,15 +1106,11 @@ def api_optimize():
     study_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     n_trials = request.args.get("trials", 200, type=int)
 
-    venv_python = os.path.join(os.path.dirname(BASE_DIR), ".venv", "bin", "python3")
-    if not os.path.exists(venv_python):
-        venv_python = "python3"
-
     opt_env = os.environ.copy()
     opt_env["STUDY_ID"] = study_id
 
     proc = subprocess.Popen(
-        [venv_python, "-u", os.path.join(BASE_DIR, "auto_optimize.py"), str(n_trials)],
+        [sys.executable, "-u", os.path.join(BASE_DIR, "auto_optimize.py"), str(n_trials)],
         cwd=BASE_DIR,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
