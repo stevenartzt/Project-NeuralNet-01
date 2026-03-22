@@ -1010,8 +1010,9 @@ def index():
 
 @app.route("/api/runs")
 def api_runs():
-    """List all training runs."""
+    """List all training runs and optimization results."""
     runs = []
+    # Training runs
     for f in sorted(glob.glob(os.path.join(MODELS_DIR, "history_*.json")), reverse=True):
         try:
             with open(f) as fh:
@@ -1022,6 +1023,22 @@ def api_runs():
                 "started_at": h.get("started_at"),
                 "best_accuracy": h.get("best_test_accuracy"),
                 "epochs": len(h.get("epochs_data", []))
+            })
+        except:
+            pass
+    # Optimization runs
+    opt_dir = os.path.join(BASE_DIR, "optimize")
+    for f in sorted(glob.glob(os.path.join(opt_dir, "status_*.json")), reverse=True):
+        try:
+            with open(f) as fh:
+                s = json.load(fh)
+            runs.append({
+                "run_id": f"opt_{s['study_id']}",
+                "status": s.get("status", "unknown"),
+                "started_at": s.get("updated_at"),
+                "best_accuracy": s.get("best_accuracy") or s.get("final_accuracy"),
+                "epochs": s.get("completed_trials", 0),
+                "type": "optimizer"
             })
         except:
             pass
