@@ -1073,6 +1073,18 @@ def api_train():
     )
 
     training_process = {"proc": proc, "run_id": run_id}
+
+    # Log subprocess output to a file for debugging
+    def log_output(process, rid):
+        log_path = os.path.join(MODELS_DIR, f"log_{rid}.txt")
+        with open(log_path, "w") as lf:
+            for line in process.stdout:
+                lf.write(line.decode("utf-8", errors="replace"))
+                lf.flush()
+            process.wait()
+            lf.write(f"\n--- Exit code: {process.returncode} ---\n")
+    threading.Thread(target=log_output, args=(proc, run_id), daemon=True).start()
+
     return jsonify({"run_id": run_id, "status": "started"})
 
 
@@ -1094,6 +1106,16 @@ def api_data_status():
         with open(meta_path) as f:
             return jsonify(json.load(f))
     return jsonify({"status": "no data", "message": "Run fetch_data.py first"})
+
+
+@app.route("/api/log/<run_id>")
+def api_log(run_id):
+    """Get subprocess log for debugging."""
+    log_path = os.path.join(MODELS_DIR, f"log_{run_id}.txt")
+    if not os.path.exists(log_path):
+        return jsonify({"error": "No log found", "hint": "Training may not have started. Check that all dependencies are installed: pip install -r requirements.txt"})
+    with open(log_path) as f:
+        return jsonify({"log": f.read()})
 
 
 @app.route("/api/optimize", methods=["POST"])
