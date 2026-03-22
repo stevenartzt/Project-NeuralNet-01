@@ -372,6 +372,20 @@ def run_optimization(n_trials=200, study_id=None):
             "n_trials": n_trials,
         }, f, indent=2)
 
+    # Run a full training with best params so dashboard gets loss curves, activations, etc.
+    print("\n📊 Running full training with best params for dashboard visualization...")
+    from train import train_model
+    train_model(
+        epochs=60,
+        batch_size=best.get("batch_size", 128),
+        lr=best.get("lr", 0.001),
+        hidden_sizes=hidden_sizes,
+        dropout=best.get("dropout", 0.1),
+        patience=15,
+        run_id=f"optimized_{study_id}"
+    )
+    print(f"   Dashboard run saved as: optimized_{study_id}")
+
     return study
 
 
