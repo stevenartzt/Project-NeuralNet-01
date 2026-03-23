@@ -348,11 +348,13 @@ def train_lstm(
     # Feature importance via gradient attribution across all time steps
     print("📊 Computing LSTM feature importance...")
     model.train()  # CUDA RNN requires training mode for backward pass
-    X_test_t = X_test_t.detach().requires_grad_(True)
-    outputs = model(X_test_t)
+    # Sample to avoid OOM on large test sets
+    sample_size = min(5000, len(X_test_t))
+    X_sample = X_test_t[:sample_size].detach().requires_grad_(True)
+    outputs = model(X_sample)
     outputs.sum().backward()
     # Gradient shape: (batch, seq_len, features) — average across batch and time steps
-    grads = X_test_t.grad.abs().mean(dim=0).mean(dim=0).cpu().numpy()  # Average over batch, then over seq
+    grads = X_sample.grad.abs().mean(dim=0).mean(dim=0).cpu().numpy()  # Average over batch, then over seq
     importance_dict = {name: round(float(imp), 6) for name, imp in zip(features, grads)}
     importance_sorted = dict(sorted(importance_dict.items(), key=lambda x: x[1], reverse=True))
     history["feature_importance"] = importance_sorted
