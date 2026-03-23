@@ -156,6 +156,27 @@ def compute_indicators(df):
     # --- VWAP (daily approximation) ---
     df["vwap"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum().replace(0, np.nan)
 
+    # --- RSI Divergence ---
+    # Compare price lows/highs vs RSI lows/highs over 14-day windows
+    lookback = 14
+    price_min = df["Close"].rolling(lookback).min()
+    price_max = df["Close"].rolling(lookback).max()
+    rsi_at_price_min = df["rsi"].where(df["Close"] == price_min).ffill()
+    rsi_at_price_max = df["rsi"].where(df["Close"] == price_max).ffill()
+
+    # Bullish divergence: price making lower lows, RSI making higher lows
+    price_lower_low = df["Close"] < price_min.shift(lookback)
+    rsi_higher_low = df["rsi"] > df["rsi"].rolling(lookback).min().shift(lookback)
+    df["rsi_bull_divergence"] = (price_lower_low & rsi_higher_low).astype(int)
+
+    # Bearish divergence: price making higher highs, RSI making lower highs
+    price_higher_high = df["Close"] > price_max.shift(lookback)
+    rsi_lower_high = df["rsi"] < df["rsi"].rolling(lookback).max().shift(lookback)
+    df["rsi_bear_divergence"] = (price_higher_high & rsi_lower_high).astype(int)
+
+    # Combined: +1 bullish, -1 bearish, 0 none
+    df["rsi_divergence"] = df["rsi_bull_divergence"] - df["rsi_bear_divergence"]
+
     # --- Trend direction features ---
     df["above_sma20"] = (df["Close"] > df["sma_20"]).astype(int)
     df["above_sma50"] = (df["Close"] > df["sma_50"]).astype(int)
