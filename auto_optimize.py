@@ -207,6 +207,17 @@ def run_tree_baselines(X_train, X_test, y_train, y_test, features):
     except Exception as e:
         print(f"   GradientBoosting failed: {e}")
 
+    try:
+        from sklearn.svm import SVC
+        # SVM with RBF kernel — sample for speed (SVM is O(n²))
+        sample_size = min(10000, len(X_train))
+        idx = np.random.choice(len(X_train), sample_size, replace=False)
+        svm = SVC(kernel='rbf', gamma='scale', C=1.0, random_state=42)
+        svm.fit(X_train[idx], y_train[idx])
+        results["SVM_RBF"] = round(accuracy_score(y_test, svm.predict(X_test)), 4)
+    except Exception as e:
+        print(f"   SVM RBF failed: {e}")
+
     return results
 
 
