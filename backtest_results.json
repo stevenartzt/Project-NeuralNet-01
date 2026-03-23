@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Opscan v1.1 (Current)",
+    "total_signals": 2750,
+    "buy_signals": 1431,
+    "sell_signals": 1319,
+    "buy_accuracy": 52.9,
+    "sell_accuracy": 47.8,
+    "combined_accuracy": 50.4,
+    "win_rate": 50.4,
+    "avg_return_pct": -0.013,
+    "total_return_pct": -35.5,
+    "profit_factor": 0.98,
+    "sharpe": -0.08
+  },
+  {
+    "name": "Neural Net Informed v1.0",
+    "total_signals": 2652,
+    "buy_signals": 1584,
+    "sell_signals": 1068,
+    "buy_accuracy": 52.0,
+    "sell_accuracy": 49.6,
+    "combined_accuracy": 51.1,
+    "win_rate": 51.1,
+    "avg_return_pct": 0.044,
+    "total_return_pct": 117.93,
+    "profit_factor": 1.06,
+    "sharpe": 0.29
+  },
+  {
+    "name": "Neural Net Top-5 Only",
+    "total_signals": 3015,
+    "buy_signals": 2195,
+    "sell_signals": 820,
+    "buy_accuracy": 50.0,
+    "sell_accuracy": 46.1,
+    "combined_accuracy": 48.9,
+    "win_rate": 48.9,
+    "avg_return_pct": 0.03,
+    "total_return_pct": 91.69,
+    "profit_factor": 1.04,
+    "sharpe": 0.18
+  }
+]
