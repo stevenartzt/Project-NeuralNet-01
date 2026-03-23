@@ -377,11 +377,16 @@ def train_model(
 
 
 def _save_history(history, path):
-    """Save history atomically."""
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(history, f, indent=2, default=str)
-    os.replace(tmp, path)
+    """Save history."""
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(history, f, indent=2, default=str)
+        os.replace(tmp, path)
+    except (PermissionError, OSError):
+        # Windows file locking — write directly
+        with open(path, "w") as f:
+            json.dump(history, f, indent=2, default=str)
 
 
 if __name__ == "__main__":
