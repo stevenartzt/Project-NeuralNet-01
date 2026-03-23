@@ -77,6 +77,34 @@ NEURAL_TOP5 = {
     },
 }
 
+# ── Neural Net v2.0 — GPU-trained, 595K samples, real divergence data ──
+NEURAL_V2 = {
+    "name": "Neural Net v2.0 (GPU/595K)",
+    "weights": {
+        "atr_pct": 22,            # #1 — dominant
+        "volatility_10d": 17,     # #2
+        "stoch_d": 16,            # #3 — stochastic now relevant
+        "return_20d": 16,         # #4 — long-term momentum
+        "daily_range_pct": 15,    # #5
+        "return_10d": 15,         # #6
+        "volatility_20d": 15,     # #7
+        "return_1d": 15,          # #8
+        "return_5d": 14,          # #10
+        "bb_position": 14,        # #11
+        "stoch_k": 13,            # #12
+        "bb_width": 13,           # #13
+        "volume_ratio": 12,       # #14
+        "minus_di": 11,           # #15
+        "plus_di": 11,            # #16
+        "close_in_range": 10,     # #17
+        "rsi": 8,                 # #9 but still mid-tier
+        "adx": 7,                 # #18
+        "above_sma20": 5,         # bottom
+        "above_sma50": 6,         # bottom
+        "macd": 3,                # dead last
+    },
+}
+
 
 def compute_composite_score(row, weights):
     """Compute weighted composite score for a single row."""
@@ -204,7 +232,7 @@ if __name__ == "__main__":
     print(f"Data: {len(df)} rows")
     print()
     
-    configs = [OPSCAN_V11, NEURAL_V1, NEURAL_TOP5]
+    configs = [OPSCAN_V11, NEURAL_V1, NEURAL_V2]
     results = []
     
     for config in configs:

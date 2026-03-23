@@ -28,17 +28,17 @@
     "sharpe": 0.29
   },
   {
-    "name": "Neural Net Top-5 Only",
-    "total_signals": 3015,
-    "buy_signals": 2195,
-    "sell_signals": 820,
-    "buy_accuracy": 50.0,
-    "sell_accuracy": 46.1,
-    "combined_accuracy": 48.9,
-    "win_rate": 48.9,
-    "avg_return_pct": 0.03,
-    "total_return_pct": 91.69,
-    "profit_factor": 1.04,
-    "sharpe": 0.18
+    "name": "Neural Net v2.0 (GPU/595K)",
+    "total_signals": 2751,
+    "buy_signals": 1431,
+    "sell_signals": 1320,
+    "buy_accuracy": 53.5,
+    "sell_accuracy": 47.9,
+    "combined_accuracy": 50.8,
+    "win_rate": 50.8,
+    "avg_return_pct": 0.005,
+    "total_return_pct": 14.73,
+    "profit_factor": 1.01,
+    "sharpe": 0.03
   }
 ]
