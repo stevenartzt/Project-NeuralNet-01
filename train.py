@@ -112,7 +112,7 @@ def load_data():
     X = X[mask]
     y = y[mask]
 
-    return X, y, available_features, df
+    return X, y, available_features, df, num_classes
 
 
 def train_model(
@@ -139,7 +139,7 @@ def train_model(
     print("=" * 50)
 
     # Load data
-    X, y, feature_names, raw_df = load_data()
+    X, y, feature_names, raw_df, num_classes = load_data()
     print(f"Data: {len(X)} samples, {len(feature_names)} features")
     print(f"Classes: sell={np.sum(y==0)}, neutral={np.sum(y==1)}, buy={np.sum(y==2)}")
 
