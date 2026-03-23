@@ -156,42 +156,79 @@ def compute_indicators(df):
     # --- VWAP (daily approximation) ---
     df["vwap"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum().replace(0, np.nan)
 
-    # --- RSI Divergence (using rsi-divergence-detector library) ---
+    # --- RSI Divergence (using SciPy peak detection) ---
     try:
-        from rsi_divergence import find_divergences, wilder_rsi
-        rsi_series = pd.Series(wilder_rsi(df["Close"], period=14), index=df.index, dtype=float)
-        divs = find_divergences(df["Close"].astype(float), rsi_series, include_hidden=True)
+        from scipy.signal import argrelextrema
 
-        # Initialize divergence columns
+        rsi_vals = df["rsi"].values
+        close_vals = df["Close"].values
+        lookback = 5  # Window for local extrema detection
+
         df["rsi_bull_divergence"] = 0
         df["rsi_bear_divergence"] = 0
         df["rsi_hidden_bull"] = 0
         df["rsi_hidden_bear"] = 0
 
-        for _, d in divs.iterrows():
-            idx = int(d["p2_idx"])  # Signal at the second pivot
-            if idx < len(df):
-                if d["kind"] == "regular_bullish":
-                    df.iloc[idx, df.columns.get_loc("rsi_bull_divergence")] = 1
-                elif d["kind"] == "regular_bearish":
-                    df.iloc[idx, df.columns.get_loc("rsi_bear_divergence")] = 1
-                elif d["kind"] == "hidden_bullish":
-                    df.iloc[idx, df.columns.get_loc("rsi_hidden_bull")] = 1
-                elif d["kind"] == "hidden_bearish":
-                    df.iloc[idx, df.columns.get_loc("rsi_hidden_bear")] = 1
+        # Find local minima and maxima in price and RSI
+        price_lows = argrelextrema(close_vals, np.less_equal, order=lookback)[0]
+        price_highs = argrelextrema(close_vals, np.greater_equal, order=lookback)[0]
+        rsi_lows = argrelextrema(rsi_vals, np.less_equal, order=lookback)[0]
+        rsi_highs = argrelextrema(rsi_vals, np.greater_equal, order=lookback)[0]
 
-        # Combined: +1 bullish (regular+hidden), -1 bearish (regular+hidden), 0 none
+        # Regular Bullish: price lower low + RSI higher low
+        for i in range(1, len(price_lows)):
+            p1, p2 = price_lows[i-1], price_lows[i]
+            if close_vals[p2] < close_vals[p1]:  # Price made lower low
+                # Find RSI lows near these price lows
+                r1_candidates = rsi_lows[(rsi_lows >= p1-lookback) & (rsi_lows <= p1+lookback)]
+                r2_candidates = rsi_lows[(rsi_lows >= p2-lookback) & (rsi_lows <= p2+lookback)]
+                if len(r1_candidates) > 0 and len(r2_candidates) > 0:
+                    r1, r2 = r1_candidates[0], r2_candidates[0]
+                    if rsi_vals[r2] > rsi_vals[r1]:  # RSI made higher low
+                        if p2 < len(df):
+                            df.iloc[p2, df.columns.get_loc("rsi_bull_divergence")] = 1
+
+        # Regular Bearish: price higher high + RSI lower high
+        for i in range(1, len(price_highs)):
+            p1, p2 = price_highs[i-1], price_highs[i]
+            if close_vals[p2] > close_vals[p1]:  # Price made higher high
+                r1_candidates = rsi_highs[(rsi_highs >= p1-lookback) & (rsi_highs <= p1+lookback)]
+                r2_candidates = rsi_highs[(rsi_highs >= p2-lookback) & (rsi_highs <= p2+lookback)]
+                if len(r1_candidates) > 0 and len(r2_candidates) > 0:
+                    r1, r2 = r1_candidates[0], r2_candidates[0]
+                    if rsi_vals[r2] < rsi_vals[r1]:  # RSI made lower high
+                        if p2 < len(df):
+                            df.iloc[p2, df.columns.get_loc("rsi_bear_divergence")] = 1
+
+        # Hidden Bullish: price higher low + RSI lower low (trend continuation)
+        for i in range(1, len(price_lows)):
+            p1, p2 = price_lows[i-1], price_lows[i]
+            if close_vals[p2] > close_vals[p1]:  # Price made higher low
+                r1_candidates = rsi_lows[(rsi_lows >= p1-lookback) & (rsi_lows <= p1+lookback)]
+                r2_candidates = rsi_lows[(rsi_lows >= p2-lookback) & (rsi_lows <= p2+lookback)]
+                if len(r1_candidates) > 0 and len(r2_candidates) > 0:
+                    r1, r2 = r1_candidates[0], r2_candidates[0]
+                    if rsi_vals[r2] < rsi_vals[r1]:  # RSI made lower low
+                        if p2 < len(df):
+                            df.iloc[p2, df.columns.get_loc("rsi_hidden_bull")] = 1
+
+        # Hidden Bearish: price lower high + RSI higher high (trend continuation)
+        for i in range(1, len(price_highs)):
+            p1, p2 = price_highs[i-1], price_highs[i]
+            if close_vals[p2] < close_vals[p1]:  # Price made lower high
+                r1_candidates = rsi_highs[(rsi_highs >= p1-lookback) & (rsi_highs <= p1+lookback)]
+                r2_candidates = rsi_highs[(rsi_highs >= p2-lookback) & (rsi_highs <= p2+lookback)]
+                if len(r1_candidates) > 0 and len(r2_candidates) > 0:
+                    r1, r2 = r1_candidates[0], r2_candidates[0]
+                    if rsi_vals[r2] > rsi_vals[r1]:  # RSI made higher high
+                        if p2 < len(df):
+                            df.iloc[p2, df.columns.get_loc("rsi_hidden_bear")] = 1
+
+        # Combined
         df["rsi_divergence"] = (df["rsi_bull_divergence"] + df["rsi_hidden_bull"]) - \
                                 (df["rsi_bear_divergence"] + df["rsi_hidden_bear"])
-    except ImportError:
-        # Fallback if library not installed
-        df["rsi_bull_divergence"] = 0
-        df["rsi_bear_divergence"] = 0
-        df["rsi_hidden_bull"] = 0
-        df["rsi_hidden_bear"] = 0
-        df["rsi_divergence"] = 0
     except Exception as e:
-        print(f"  RSI divergence detection failed for ticker: {e}")
+        print(f"  RSI divergence detection failed: {e}")
         df["rsi_bull_divergence"] = 0
         df["rsi_bear_divergence"] = 0
         df["rsi_hidden_bull"] = 0
