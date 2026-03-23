@@ -347,8 +347,8 @@ def train_lstm(
 
     # Feature importance via gradient attribution across all time steps
     print("📊 Computing LSTM feature importance...")
-    model.eval()
-    X_test_t.requires_grad_(True)
+    model.train()  # CUDA RNN requires training mode for backward pass
+    X_test_t = X_test_t.detach().requires_grad_(True)
     outputs = model(X_test_t)
     outputs.sum().backward()
     # Gradient shape: (batch, seq_len, features) — average across batch and time steps
