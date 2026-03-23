@@ -35,7 +35,7 @@ FEATURE_COLS = [
     "volatility_10d", "volatility_20d",
     "above_sma20", "above_sma50", "sma_cross",
     "daily_range_pct", "close_in_range",
-    "rsi_divergence", "rsi_bull_divergence", "rsi_bear_divergence",
+    "rsi_divergence", "rsi_bull_divergence", "rsi_bear_divergence", "rsi_hidden_bull", "rsi_hidden_bear",
 ]
 
 # Columns excluded from features (raw price data, identifiers, targets)

@@ -156,26 +156,47 @@ def compute_indicators(df):
     # --- VWAP (daily approximation) ---
     df["vwap"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum().replace(0, np.nan)
 
-    # --- RSI Divergence ---
-    # Compare price lows/highs vs RSI lows/highs over 14-day windows
-    lookback = 14
-    price_min = df["Close"].rolling(lookback).min()
-    price_max = df["Close"].rolling(lookback).max()
-    rsi_at_price_min = df["rsi"].where(df["Close"] == price_min).ffill()
-    rsi_at_price_max = df["rsi"].where(df["Close"] == price_max).ffill()
+    # --- RSI Divergence (using rsi-divergence-detector library) ---
+    try:
+        from rsi_divergence import find_divergences, wilder_rsi
+        rsi_series = pd.Series(wilder_rsi(df["Close"], period=14), index=df.index, dtype=float)
+        divs = find_divergences(df["Close"].astype(float), rsi_series, include_hidden=True)
 
-    # Bullish divergence: price making lower lows, RSI making higher lows
-    price_lower_low = df["Close"] < price_min.shift(lookback)
-    rsi_higher_low = df["rsi"] > df["rsi"].rolling(lookback).min().shift(lookback)
-    df["rsi_bull_divergence"] = (price_lower_low & rsi_higher_low).astype(int)
+        # Initialize divergence columns
+        df["rsi_bull_divergence"] = 0
+        df["rsi_bear_divergence"] = 0
+        df["rsi_hidden_bull"] = 0
+        df["rsi_hidden_bear"] = 0
 
-    # Bearish divergence: price making higher highs, RSI making lower highs
-    price_higher_high = df["Close"] > price_max.shift(lookback)
-    rsi_lower_high = df["rsi"] < df["rsi"].rolling(lookback).max().shift(lookback)
-    df["rsi_bear_divergence"] = (price_higher_high & rsi_lower_high).astype(int)
+        for _, d in divs.iterrows():
+            idx = int(d["p2_idx"])  # Signal at the second pivot
+            if idx < len(df):
+                if d["kind"] == "regular_bullish":
+                    df.iloc[idx, df.columns.get_loc("rsi_bull_divergence")] = 1
+                elif d["kind"] == "regular_bearish":
+                    df.iloc[idx, df.columns.get_loc("rsi_bear_divergence")] = 1
+                elif d["kind"] == "hidden_bullish":
+                    df.iloc[idx, df.columns.get_loc("rsi_hidden_bull")] = 1
+                elif d["kind"] == "hidden_bearish":
+                    df.iloc[idx, df.columns.get_loc("rsi_hidden_bear")] = 1
 
-    # Combined: +1 bullish, -1 bearish, 0 none
-    df["rsi_divergence"] = df["rsi_bull_divergence"] - df["rsi_bear_divergence"]
+        # Combined: +1 bullish (regular+hidden), -1 bearish (regular+hidden), 0 none
+        df["rsi_divergence"] = (df["rsi_bull_divergence"] + df["rsi_hidden_bull"]) - \
+                                (df["rsi_bear_divergence"] + df["rsi_hidden_bear"])
+    except ImportError:
+        # Fallback if library not installed
+        df["rsi_bull_divergence"] = 0
+        df["rsi_bear_divergence"] = 0
+        df["rsi_hidden_bull"] = 0
+        df["rsi_hidden_bear"] = 0
+        df["rsi_divergence"] = 0
+    except Exception as e:
+        print(f"  RSI divergence detection failed for ticker: {e}")
+        df["rsi_bull_divergence"] = 0
+        df["rsi_bear_divergence"] = 0
+        df["rsi_hidden_bull"] = 0
+        df["rsi_hidden_bear"] = 0
+        df["rsi_divergence"] = 0
 
     # --- Trend direction features ---
     df["above_sma20"] = (df["Close"] > df["sma_20"]).astype(int)
