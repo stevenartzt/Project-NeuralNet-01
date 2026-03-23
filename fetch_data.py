@@ -248,19 +248,25 @@ def compute_indicators(df):
     return df
 
 
-def create_labels(df, forward_hours=4):
+def create_labels(df, forward_periods=1, threshold=0.005, binary=False):
     """
     Create buy/sell labels based on future price movement.
-    Using daily data: forward_hours=4 ≈ 1 day, forward_hours=8 ≈ 2 days.
-    Label: 1 = price went up by 0.5%+, 0 = neutral/down, -1 = down 0.5%+
+    
+    Args:
+        forward_periods: How many candles ahead to look (1=next candle, 4=4 candles ahead)
+        threshold: Minimum move for BUY/SELL classification (ignored if binary=True)
+        binary: If True, just UP (1) or DOWN (0) — 2-class problem
     """
-    forward_days = max(1, forward_hours // 4)
-    future_return = df["Close"].shift(-forward_days) / df["Close"] - 1
+    future_return = df["Close"].shift(-forward_periods) / df["Close"] - 1
 
-    # Three classes: buy (>0.5%), sell (<-0.5%), neutral
-    labels = pd.Series(0, index=df.index)  # neutral
-    labels[future_return > 0.005] = 1   # buy
-    labels[future_return < -0.005] = -1  # sell
+    if binary:
+        # 2-class: UP or DOWN (no neutral)
+        labels = (future_return > 0).astype(int)  # 1 = up, 0 = down
+    else:
+        # 3-class: buy (>threshold), sell (<-threshold), neutral
+        labels = pd.Series(0, index=df.index)  # neutral
+        labels[future_return > threshold] = 1   # buy
+        labels[future_return < -threshold] = -1  # sell
 
     df["label"] = labels
     df["future_return"] = future_return
@@ -293,7 +299,8 @@ def fetch_ticker(ticker, period="5y", interval="1d"):
         return None
 
 
-def fetch_all(tickers=None, period="5y"):
+def fetch_all(tickers=None, period="5y", interval="1d", forward_periods=1,
+              threshold=0.005, binary=False):
     """Fetch and process all tickers."""
     if tickers is None:
         tickers = TICKERS
@@ -303,10 +310,11 @@ def fetch_all(tickers=None, period="5y"):
 
     for i, ticker in enumerate(tickers):
         print(f"  [{i+1}/{total}] Fetching {ticker}...")
-        df = fetch_ticker(ticker, period=period)
+        df = fetch_ticker(ticker, period=period, interval=interval)
         if df is not None and len(df) > 50:
             df = compute_indicators(df)
-            df = create_labels(df)
+            df = create_labels(df, forward_periods=forward_periods,
+                              threshold=threshold, binary=binary)
             all_data.append(df)
         time.sleep(0.2)  # Rate limit
 
@@ -348,6 +356,28 @@ def fetch_all(tickers=None, period="5y"):
 
 
 if __name__ == "__main__":
-    print("🧠 Neural Net Data Fetcher — Independent System")
+    import argparse
+    parser = argparse.ArgumentParser(description="Neural Net Data Fetcher")
+    parser.add_argument("--interval", default="1d", help="Candle interval: 1d, 1h, 15m, 5m (default: 1d)")
+    parser.add_argument("--period", default="5y", help="Data period: 1y, 2y, 5y, max (default: 5y). Note: intraday limited to ~60 days")
+    parser.add_argument("--forward", type=int, default=1, help="Look-ahead periods (default: 1 = next candle)")
+    parser.add_argument("--threshold", type=float, default=0.005, help="Min move for BUY/SELL (default: 0.005 = 0.5%%)")
+    parser.add_argument("--binary", action="store_true", help="2-class (UP/DOWN) instead of 3-class (BUY/SELL/NEUTRAL)")
+    args = parser.parse_args()
+
+    # Auto-adjust period for intraday (yfinance limits)
+    if args.interval in ["15m", "5m"]:
+        if args.period not in ["1mo", "60d"]:
+            print(f"⚠️  yfinance limits {args.interval} data to ~60 days. Setting period=60d")
+            args.period = "60d"
+    elif args.interval == "1h":
+        if args.period in ["5y", "max"]:
+            print(f"⚠️  yfinance limits 1h data to ~730 days. Setting period=2y")
+            args.period = "2y"
+
+    print(f"🧠 Neural Net Data Fetcher — Independent System")
+    print(f"   Interval: {args.interval} | Period: {args.period} | Forward: {args.forward} candles")
+    print(f"   Mode: {'Binary (UP/DOWN)' if args.binary else f'3-class (threshold: {args.threshold*100:.1f}%)'}")
     print("=" * 50)
-    fetch_all()
+    fetch_all(period=args.period, interval=args.interval, forward_periods=args.forward,
+              threshold=args.threshold, binary=args.binary)

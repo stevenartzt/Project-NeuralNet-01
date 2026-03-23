@@ -97,8 +97,15 @@ def load_data():
     X = df[available_features].values
     y = df["label"].values
 
-    # Remap labels: -1,0,1 → 0,1,2 for cross-entropy
-    y = y + 1  # -1→0, 0→1, 1→2
+    # Detect binary vs 3-class
+    unique_labels = set(np.unique(y[np.isfinite(y)]).astype(int))
+    if unique_labels == {0, 1}:
+        num_classes = 2  # Binary mode
+        print("Mode: Binary (UP/DOWN)")
+    else:
+        num_classes = 3  # 3-class mode
+        y = y + 1  # -1→0, 0→1, 1→2
+        print("Mode: 3-class (SELL/NEUTRAL/BUY)")
 
     # Remove any remaining NaN/inf
     mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
@@ -164,16 +171,17 @@ def train_model(
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Class weights for imbalanced data
-    class_counts = np.bincount(y_train.astype(int), minlength=3)
+    class_counts = np.bincount(y_train.astype(int), minlength=num_classes)
     class_weights = 1.0 / (class_counts + 1)
-    class_weights = class_weights / class_weights.sum() * 3
+    class_weights = class_weights / class_weights.sum() * num_classes
     weights_tensor = torch.FloatTensor(class_weights)
 
     # Model
     model = DirectionNet(
         input_size=len(feature_names),
         hidden_sizes=hidden_sizes,
-        dropout=dropout
+        dropout=dropout,
+        num_classes=num_classes
     ).to(device)
 
     criterion = nn.CrossEntropyLoss(weight=weights_tensor.to(device))
@@ -344,9 +352,10 @@ def train_model(
     model.eval()
     with torch.no_grad():
         final_preds = model(X_test_t).argmax(1).cpu().numpy()
+        target_names = ["DOWN", "UP"] if num_classes == 2 else ["SELL", "NEUTRAL", "BUY"]
         final_report = classification_report(
             y_test_t.cpu().numpy(), final_preds,
-            target_names=["SELL", "NEUTRAL", "BUY"],
+            target_names=target_names,
             output_dict=True
         )
 
