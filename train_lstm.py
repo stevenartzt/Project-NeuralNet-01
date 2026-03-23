@@ -345,6 +345,23 @@ def train_lstm(
             target_names=labels, output_dict=True
         )
 
+    # Feature importance via gradient attribution across all time steps
+    print("📊 Computing LSTM feature importance...")
+    model.eval()
+    X_test_t.requires_grad_(True)
+    outputs = model(X_test_t)
+    outputs.sum().backward()
+    # Gradient shape: (batch, seq_len, features) — average across batch and time steps
+    grads = X_test_t.grad.abs().mean(dim=0).mean(dim=0).cpu().numpy()  # Average over batch, then over seq
+    importance_dict = {name: round(float(imp), 6) for name, imp in zip(features, grads)}
+    importance_sorted = dict(sorted(importance_dict.items(), key=lambda x: x[1], reverse=True))
+    history["feature_importance"] = importance_sorted
+
+    print("   Top LSTM features:")
+    for i, (name, imp) in enumerate(list(importance_sorted.items())[:10]):
+        bar = "█" * int(imp * 200)
+        print(f"   {i+1}. {name:20s} {imp:.4f} {bar}")
+
     history["status"] = "complete"
     history["completed_at"] = datetime.now().isoformat()
     history["best_test_accuracy"] = round(best_acc, 4)
@@ -369,6 +386,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=60, help="Training epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--batch", type=int, default=512, help="Batch size")
+    parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate (default 0.2)")
     parser.add_argument("--run-id", type=str, default=None, help="Run ID for dashboard")
     args = parser.parse_args()
 
@@ -379,5 +397,6 @@ if __name__ == "__main__":
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch,
+        dropout=args.dropout,
         run_id=args.run_id,
     )
