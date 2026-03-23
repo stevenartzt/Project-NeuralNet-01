@@ -261,8 +261,8 @@ def train_model(
             test_acc = (test_preds == y_test_t).float().mean().item()
 
             # Per-class accuracy
-            test_preds_np = test_preds.numpy()
-            y_test_np = y_test_t.numpy()
+            test_preds_np = test_preds.cpu().numpy()
+            y_test_np = y_test_t.cpu().numpy()
             per_class = {}
             for cls_idx, cls_name in enumerate(["sell", "neutral", "buy"]):
                 mask = y_test_np == cls_idx
@@ -343,9 +343,9 @@ def train_model(
     # Final evaluation
     model.eval()
     with torch.no_grad():
-        final_preds = model(X_test_t).argmax(1).numpy()
+        final_preds = model(X_test_t).argmax(1).cpu().numpy()
         final_report = classification_report(
-            y_test_t.numpy(), final_preds,
+            y_test_t.cpu().numpy(), final_preds,
             target_names=["SELL", "NEUTRAL", "BUY"],
             output_dict=True
         )
@@ -361,7 +361,7 @@ def train_model(
     X_test_t.requires_grad_(True)
     outputs = model(X_test_t)
     outputs.sum().backward()
-    importance = X_test_t.grad.abs().mean(0).numpy()
+    importance = X_test_t.grad.abs().mean(0).cpu().numpy()
     importance_dict = {name: round(float(imp), 6) for name, imp in zip(feature_names, importance)}
     importance_sorted = dict(sorted(importance_dict.items(), key=lambda x: x[1], reverse=True))
     history["feature_importance"] = importance_sorted
