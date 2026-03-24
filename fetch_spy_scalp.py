@@ -69,9 +69,12 @@ def compute_intraday_features(df):
 
     # Distance from day high/low (resets per day)
     if "Date" in df.columns:
-        df["day"] = pd.to_datetime(df["Date"]).dt.date
+        dt = pd.to_datetime(df["Date"])
+        if dt.dt.tz is not None:
+            dt = dt.dt.tz_convert("America/New_York")
+        df["day"] = dt.dt.date.astype(str)
     else:
-        df["day"] = df.index // 78  # ~78 five-min bars per day
+        df["day"] = (df.index // 78).astype(str)
 
     df["day_high"] = df.groupby("day")["High"].transform("cummax")
     df["day_low"] = df.groupby("day")["Low"].transform("cummin")
@@ -96,6 +99,8 @@ def compute_intraday_features(df):
     # Time encoding (hour + minute as features)
     if "Date" in df.columns:
         dt = pd.to_datetime(df["Date"])
+        if dt.dt.tz is not None:
+            dt = dt.dt.tz_convert("America/New_York")
         df["hour"] = dt.dt.hour
         df["minute"] = dt.dt.minute
         df["time_pct"] = ((dt.dt.hour - 9) * 60 + dt.dt.minute - 30) / 390  # 0=open, 1=close
@@ -182,7 +187,10 @@ def fetch_spy_scalp_data(period="60d", interval="5m", forward_bars=3,
     data = create_scalp_labels(data, forward_bars=forward_bars, threshold=threshold)
 
     # Filter to trading window only (10:00 - 14:00 ET)
-    data["hour_val"] = data["Date"].dt.hour
+    dt_filter = pd.to_datetime(data["Date"])
+    if dt_filter.dt.tz is not None:
+        dt_filter = dt_filter.dt.tz_convert("America/New_York")
+    data["hour_val"] = dt_filter.dt.hour
     before = len(data)
     data = data[(data["hour_val"] >= trading_start) & (data["hour_val"] < trading_end)]
     print(f"   After {trading_start}:00-{trading_end}:00 filter: {len(data)} bars (was {before})")
