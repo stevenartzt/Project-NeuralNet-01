@@ -15,7 +15,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 def run_reversion_backtest(
     rsi_oversold=30, rsi_overbought=70,
-    vol_filter=True, volume_filter=True,
+    vol_filter=True, volume_filter=True, invert_volume=False,
     take_profit=0.02, stop_loss=0.03,
     lookahead=5, period_months=6
 ):
@@ -76,11 +76,19 @@ def run_reversion_backtest(
                 if atr_pct < tdf["atr_pct"].median() and vol_20d < tdf.get("volatility_20d", pd.Series([0])).median():
                     continue
             
-            # Neural net filter 2: Volume (top 3 feature)
+            # Neural net filter 2: Volume
             if volume_filter:
                 vol_ratio = row.get("volume_ratio", 1)
-                if pd.isna(vol_ratio) or vol_ratio < 1.2:
+                if pd.isna(vol_ratio):
                     continue
+                if invert_volume:
+                    # LOW volume = quiet dip, more likely to revert
+                    if vol_ratio > 1.0:
+                        continue
+                else:
+                    # HIGH volume (original)
+                    if vol_ratio < 1.2:
+                        continue
             
             entry_price = row.get("Close", 0)
             if entry_price <= 0:
@@ -221,17 +229,27 @@ if __name__ == "__main__":
     trades_tight = run_reversion_backtest(rsi_oversold=25, rsi_overbought=75, vol_filter=True, volume_filter=True)
     r4 = analyze_trades(trades_tight, "RSI <25/>75 + Neural")
     
+    # Test 5: Inverted volume — LOW volume at extremes (quiet dips)
+    print("\n--- TEST 5: RSI + Volatility + LOW Volume (inverted) ---")
+    trades_low_vol = run_reversion_backtest(vol_filter=True, volume_filter=True, invert_volume=True)
+    r5 = analyze_trades(trades_low_vol, "RSI + Vol + LOW Volume")
+    
+    # Test 6: Tight RSI + LOW volume
+    print("\n--- TEST 6: Tight RSI <25/>75 + Vol + LOW Volume ---")
+    trades_tight_low = run_reversion_backtest(rsi_oversold=25, rsi_overbought=75, vol_filter=True, volume_filter=True, invert_volume=True)
+    r6 = analyze_trades(trades_tight_low, "Tight RSI + LOW Vol")
+    
     # Summary
     print("\n" + "=" * 60)
     print("📋 HEAD-TO-HEAD")
     print(f"{'Strategy':<35} {'Trades':>7} {'WR':>7} {'PF':>7} {'P/L':>8}")
     print("-" * 65)
-    for name, r in [("Raw RSI", r1), ("RSI + Volatility", r2), ("RSI + Vol + Volume", r3), ("Tight RSI + Neural", r4)]:
+    for name, r in [("Raw RSI", r1), ("RSI + Volatility", r2), ("RSI + Vol + HIGH Volume", r3), ("Tight RSI + HIGH Vol", r4), ("RSI + Vol + LOW Volume", r5), ("Tight RSI + LOW Vol", r6)]:
         if r:
             print(f"{name:<35} {r['trades']:>7} {r['win_rate']:>6}% {r['profit_factor']:>7} {r['total_pnl']:>7}%")
     
     # Save
-    results = {"raw": r1, "volatility": r2, "neural_full": r3, "tight_neural": r4}
+    results = {"raw": r1, "volatility": r2, "neural_full": r3, "tight_neural": r4, "low_volume": r5, "tight_low_vol": r6}
     with open(os.path.join(os.path.dirname(__file__), "reversion_backtest_results.json"), "w") as f:
         json.dump(results, f, indent=2)
     print("\nResults saved to reversion_backtest_results.json")
