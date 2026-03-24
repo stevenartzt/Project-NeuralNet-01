@@ -120,6 +120,14 @@ def compute_intraday_features(df):
     df["vol_12"] = df["return_1"].rolling(12).std()  # 1-hour vol
 
     # Volume relative to intraday average
+    if "day" not in df.columns:
+        if "Date" in df.columns:
+            dtt = pd.to_datetime(df["Date"])
+            if dtt.dt.tz is not None:
+                dtt = dtt.dt.tz_convert("America/New_York")
+            df["day"] = dtt.dt.date.astype(str)
+        else:
+            df["day"] = (df.index // 78).astype(str)
     df["vol_sma"] = df.groupby("day")["Volume"].transform(lambda x: x.expanding().mean())
     df["volume_ratio"] = df["Volume"] / df["vol_sma"].replace(0, np.nan)
 
