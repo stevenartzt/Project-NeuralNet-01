@@ -70,16 +70,59 @@ print(torch.cuda.is_available())  # Should be True
 print(torch.cuda.get_device_name(0))  # Should show your GPU
 ```
 
+## RSI + Stochastic Strategy
+
+Dedicated tools for testing RSI + Stochastic alignment:
+
+```bash
+# 1. Backtest the alignment strategy
+python backtest_rsi_stoch_alignment.py --symbol SPY --days 1460
+
+# 2. Run Monte Carlo simulation
+python monte_carlo.py --symbol SPY --days 1460 --simulations 10000
+
+# 3. Train neural net on RSI + Stochastic
+python train_rsi_stochastic.py --symbol SPY --days 730 --epochs 100
+```
+
+### Strategy Rules
+- **SHORT**: RSI > 70 AND Stochastic %K crosses below %D (both > 70)
+- **LONG**: RSI < 30 AND Stochastic %K crosses above %D (both < 30)
+
+### Custom Parameters
+```bash
+python backtest_rsi_stoch_alignment.py \
+  --symbol SPY \
+  --days 1460 \
+  --rsi-high 75 \
+  --rsi-low 25 \
+  --stoch-high 80 \
+  --stoch-low 20 \
+  --hold 5 \
+  --stop 2.0 \
+  --target 3.0
+```
+
+### Monte Carlo Output
+- Expected return distribution
+- Risk of ruin (50% drawdown)
+- Probability of profit
+- Confidence intervals (5th, 25th, 75th, 95th percentiles)
+
 ## File Structure
 
 ```
 neural-net/
-├── fetch_data.py       # Downloads OHLCV, computes 24 indicators
-├── train.py            # Neural net training engine
-├── auto_optimize.py    # Bayesian hyperparameter search
-├── app.py              # Flask dashboard with live visualizations
-├── requirements.txt    # Python dependencies
-├── data/               # Training data (generated)
-├── models/             # Saved models & training history
-└── optimize/           # Optimization run results
+├── fetch_data.py                    # Downloads OHLCV, computes 24 indicators
+├── train.py                         # Neural net training engine
+├── auto_optimize.py                 # Bayesian hyperparameter search
+├── app.py                           # Flask dashboard with live visualizations
+├── backtest_rsi_stoch_alignment.py  # RSI + Stochastic backtest
+├── monte_carlo.py                   # Monte Carlo simulation
+├── train_rsi_stochastic.py          # Neural net for RSI + Stochastic
+├── requirements.txt                 # Python dependencies
+├── data/                            # Training data (generated)
+├── models/                          # Saved models & training history
+├── training/results/                # Backtest & Monte Carlo results
+└── optimize/                        # Optimization run results
 ```
