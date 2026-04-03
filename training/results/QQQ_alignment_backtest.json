@@ -1,0 +1,28 @@
+{
+  "total_trades": 17,
+  "long_trades": 3,
+  "short_trades": 14,
+  "win_rate": 47.05882352941176,
+  "sharpe": 0.5353628399794251,
+  "total_return": 2.436339147872988,
+  "avg_return": 0.14331406752194045,
+  "max_drawdown": 4.34818767884201,
+  "profit_factor": 1.1847451514255534,
+  "target_hits": 3,
+  "stop_hits": 5,
+  "time_exits": 9,
+  "avg_win": 1.9529883263498873,
+  "avg_loss": -1.4652852736584567,
+  "params": {
+    "symbol": "QQQ",
+    "days": 1460,
+    "rsi_high": 70.0,
+    "rsi_low": 30.0,
+    "stoch_high": 70.0,
+    "stoch_low": 30.0,
+    "hold_bars": 5,
+    "stop_pct": 2.0,
+    "target_pct": 3.0
+  },
+  "timestamp": "2026-04-02T23:12:12.465310"
+}

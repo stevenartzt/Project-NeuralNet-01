@@ -1,0 +1,28 @@
+{
+  "total_trades": 17,
+  "long_trades": 4,
+  "short_trades": 13,
+  "win_rate": 47.05882352941176,
+  "sharpe": 1.0150702606435626,
+  "total_return": 3.8121005253540843,
+  "avg_return": 0.2242412073737698,
+  "max_drawdown": 5.31276057797098,
+  "profit_factor": 1.4579996191647955,
+  "target_hits": 3,
+  "stop_hits": 2,
+  "time_exits": 12,
+  "avg_win": 1.5169338798577434,
+  "avg_loss": -0.9248189459453179,
+  "params": {
+    "symbol": "SPY",
+    "days": 1460,
+    "rsi_high": 70.0,
+    "rsi_low": 30.0,
+    "stoch_high": 70.0,
+    "stoch_low": 30.0,
+    "hold_bars": 5,
+    "stop_pct": 2.0,
+    "target_pct": 3.0
+  },
+  "timestamp": "2026-04-02T23:12:05.381442"
+}
