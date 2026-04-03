@@ -1,0 +1,18 @@
+{
+  "symbol": "SPY",
+  "days": 730,
+  "epochs": 100,
+  "forecast": 5,
+  "threshold": 0.4,
+  "timestamp": "2026-04-02T23:10:10.412010",
+  "results": {
+    "trades": 65,
+    "win_rate": 49.23076923076923,
+    "sharpe": 0.2950843503941338,
+    "total_return": 1.1082528082422494,
+    "avg_return": 0.029420921898322037,
+    "max_drawdown": 25.508045293541127,
+    "long_trades": 63,
+    "short_trades": 2
+  }
+}

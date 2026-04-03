@@ -1,0 +1,18 @@
+{
+  "symbol": "QQQ",
+  "days": 730,
+  "epochs": 100,
+  "forecast": 5,
+  "threshold": 0.4,
+  "timestamp": "2026-04-02T23:10:23.154643",
+  "results": {
+    "trades": 82,
+    "win_rate": 45.1219512195122,
+    "sharpe": -2.711680386163728,
+    "total_return": -25.524995972201893,
+    "avg_return": -0.33905018668877535,
+    "max_drawdown": 37.66249455932462,
+    "long_trades": 68,
+    "short_trades": 14
+  }
+}

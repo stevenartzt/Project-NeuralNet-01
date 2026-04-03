@@ -332,6 +332,8 @@ def backtest(model, X_test, raw_data, threshold: float = 0.6) -> dict:
             'total_return': 0,
             'avg_return': 0,
             'max_drawdown': 0,
+            'long_trades': 0,
+            'short_trades': 0,
         }
     
     returns = np.array([t['return'] for t in trades])
