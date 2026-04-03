@@ -92,6 +92,7 @@ def analyze_sessions(symbol: str, days: int = 60):
     df_ny = df[(df['time_decimal'] >= 9.5) & (df['time_decimal'] < 16.0)]
     
     # Group by date
+    df_ny = df_ny.copy()
     df_ny['date'] = df_ny.index.date
     
     results = {
@@ -99,6 +100,8 @@ def analyze_sessions(symbol: str, days: int = 60):
         'bimodal_sessions': 0,
         'bimodal_dates': [],
         'unimodal_dates': [],
+        'spreads': [],
+        'spread_pcts': [],
     }
     
     for date, group in df_ny.groupby('date'):
@@ -109,6 +112,7 @@ def analyze_sessions(symbol: str, days: int = 60):
         
         # Use typical price * volume for VWAP-style weighting
         typical_price = (group['High'] + group['Low'] + group['Close']) / 3
+        mid_price = typical_price.mean()
         volumes = group['Volume'].values
         prices = typical_price.values
         
@@ -116,9 +120,19 @@ def analyze_sessions(symbol: str, days: int = 60):
         
         if is_bimodal:
             results['bimodal_sessions'] += 1
+            
+            # Calculate spread between peaks
+            if len(peak_prices) >= 2:
+                spread = abs(peak_prices[1] - peak_prices[0])
+                spread_pct = spread / mid_price * 100
+                results['spreads'].append(spread)
+                results['spread_pcts'].append(spread_pct)
+            
             results['bimodal_dates'].append({
                 'date': str(date),
                 'peaks': [round(p, 2) for p in peak_prices],
+                'spread': round(spread, 2) if len(peak_prices) >= 2 else 0,
+                'spread_pct': round(spread_pct, 3) if len(peak_prices) >= 2 else 0,
             })
         else:
             results['unimodal_dates'].append(str(date))
@@ -151,10 +165,28 @@ def main():
     print(f"Bimodal Rate: {bimodal_pct:.1f}%")
     print()
     
+    # Peak-to-peak spread statistics
+    if results['spreads']:
+        spreads = np.array(results['spreads'])
+        spread_pcts = np.array(results['spread_pcts'])
+        
+        print("\nPeak-to-Peak Distance:")
+        print(f"  Avg spread:    ${np.mean(spreads):.2f} ({np.mean(spread_pcts):.2f}%)")
+        print(f"  Median spread: ${np.median(spreads):.2f} ({np.median(spread_pcts):.2f}%)")
+        print(f"  Min spread:    ${np.min(spreads):.2f} ({np.min(spread_pcts):.2f}%)")
+        print(f"  Max spread:    ${np.max(spreads):.2f} ({np.max(spread_pcts):.2f}%)")
+        
+        print("\nSpread Distribution:")
+        print(f"  < 0.25%:     {sum(1 for x in spread_pcts if x < 0.25)} sessions")
+        print(f"  0.25-0.50%:  {sum(1 for x in spread_pcts if 0.25 <= x < 0.50)} sessions")
+        print(f"  0.50-0.75%:  {sum(1 for x in spread_pcts if 0.50 <= x < 0.75)} sessions")
+        print(f"  0.75-1.00%:  {sum(1 for x in spread_pcts if 0.75 <= x < 1.00)} sessions")
+        print(f"  > 1.00%:     {sum(1 for x in spread_pcts if x >= 1.00)} sessions")
+    
     if results['bimodal_dates']:
-        print("Recent Bimodal Days:")
+        print("\nRecent Bimodal Days:")
         for item in results['bimodal_dates'][-10:]:
-            print(f"  {item['date']}: peaks at {item['peaks']}")
+            print(f"  {item['date']}: peaks at {item['peaks']} (spread: ${item.get('spread', 0):.2f} / {item.get('spread_pct', 0):.2f}%)")
     
     print("=" * 60)
 
