@@ -16,28 +16,35 @@
   "backtest": {
     "total_trades": 17,
     "win_rate": 47.05882352941176,
-    "sharpe": 1.0150612846616391,
-    "profit_factor": 1.4579935659517878
+    "sharpe": 1.0150633180383117,
+    "profit_factor": 1.4579952953126472
   },
   "monte_carlo": {
     "simulations": 10000,
     "trades_per_sim": 100,
     "initial_capital": 10000,
-    "mean_return": 25.058528182788844,
-    "median_return": 23.369757612797656,
-    "std_return": 19.57266592412641,
-    "min_return": -30.1511761796606,
-    "max_return": 127.99077158563756,
-    "percentile_5": -4.348962934793442,
-    "percentile_25": 10.958786882485915,
-    "percentile_75": 37.6446996840534,
-    "percentile_95": 58.85994131510452,
-    "prob_profit": 91.67,
-    "prob_double": 0.11,
+    "mean_return": 24.759288128338977,
+    "median_return": 23.251208445442572,
+    "std_return": 19.59868456384846,
+    "min_return": -32.506657926204404,
+    "max_return": 110.84576341770844,
+    "percentile_5": -4.33321179000137,
+    "percentile_25": 10.841491107562632,
+    "percentile_75": 36.595833418315436,
+    "percentile_95": 59.73303472841629,
+    "prob_profit": 91.16,
+    "prob_double": 0.1,
     "risk_of_ruin": 0.0,
-    "mean_max_drawdown": 10.186791469559905,
-    "worst_drawdown": 32.99648446698363,
-    "sharpe_estimate": 1.2802818113755388
+    "mean_max_drawdown": 10.218640435337306,
+    "worst_drawdown": 37.008460870895824,
+    "sharpe_estimate": 1.2633137722931524,
+    "sortino_ratio": 4.570715293883033,
+    "dd_percentile_50": 9.384058229466067,
+    "dd_percentile_75": 12.290906486267586,
+    "dd_percentile_90": 15.662727187974559,
+    "dd_percentile_95": 17.99254497488122,
+    "dd_percentile_99": 22.616657027381073,
+    "strategy_broken_threshold": 22.616657027381073
   },
-  "timestamp": "2026-04-02T23:14:02.910789"
+  "timestamp": "2026-04-02T23:22:07.143045"
 }

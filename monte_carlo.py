@@ -45,6 +45,7 @@ def monte_carlo_simulation(returns: list,
     
     final_capitals = []
     max_drawdowns = []
+    all_sim_returns = []  # Track individual simulation returns for Sortino
     ruin_count = 0
     ruin_threshold = 0.5  # 50% drawdown = ruin
     
@@ -74,12 +75,34 @@ def monte_carlo_simulation(returns: list,
         
         final_capitals.append(capital)
         max_drawdowns.append(max_dd * 100)
+        all_sim_returns.append((capital - initial_capital) / initial_capital)
     
     final_capitals = np.array(final_capitals)
     max_drawdowns = np.array(max_drawdowns)
+    all_sim_returns = np.array(all_sim_returns)
     
     # Calculate statistics
     returns_pct = ((final_capitals - initial_capital) / initial_capital) * 100
+    
+    # Sortino Ratio: only penalize downside volatility
+    # Downside deviation = std of returns below target (0)
+    downside_returns = all_sim_returns[all_sim_returns < 0]
+    if len(downside_returns) > 0:
+        downside_std = np.std(downside_returns)
+        sortino = float(np.mean(all_sim_returns) / downside_std) if downside_std > 0 else float('inf')
+    else:
+        sortino = float('inf')  # No downside = infinite Sortino
+    
+    # Drawdown confidence intervals
+    dd_percentile_50 = float(np.percentile(max_drawdowns, 50))
+    dd_percentile_75 = float(np.percentile(max_drawdowns, 75))
+    dd_percentile_90 = float(np.percentile(max_drawdowns, 90))
+    dd_percentile_95 = float(np.percentile(max_drawdowns, 95))
+    dd_percentile_99 = float(np.percentile(max_drawdowns, 99))
+    
+    # Strategy "broken" threshold: 99th percentile DD
+    # If you exceed this in live trading, strategy may be dead
+    strategy_broken_dd = dd_percentile_99
     
     return {
         'simulations': num_simulations,
@@ -100,6 +123,13 @@ def monte_carlo_simulation(returns: list,
         'mean_max_drawdown': float(np.mean(max_drawdowns)),
         'worst_drawdown': float(np.max(max_drawdowns)),
         'sharpe_estimate': float(np.mean(returns_pct) / np.std(returns_pct)) if np.std(returns_pct) > 0 else 0,
+        'sortino_ratio': sortino,
+        'dd_percentile_50': dd_percentile_50,
+        'dd_percentile_75': dd_percentile_75,
+        'dd_percentile_90': dd_percentile_90,
+        'dd_percentile_95': dd_percentile_95,
+        'dd_percentile_99': dd_percentile_99,
+        'strategy_broken_threshold': strategy_broken_dd,
     }
 
 
@@ -189,7 +219,19 @@ def main():
     print()
     print(f"Mean Max Drawdown: {mc_results['mean_max_drawdown']:.1f}%")
     print(f"Worst Drawdown: {mc_results['worst_drawdown']:.1f}%")
-    print(f"Sharpe Estimate: {mc_results['sharpe_estimate']:.2f}")
+    print()
+    print(f"Sharpe Ratio: {mc_results['sharpe_estimate']:.2f}")
+    print(f"Sortino Ratio: {mc_results['sortino_ratio']:.2f}")
+    print()
+    print("Drawdown Confidence Intervals:")
+    print(f"  50% of runs stay under: {mc_results['dd_percentile_50']:.1f}% DD")
+    print(f"  75% of runs stay under: {mc_results['dd_percentile_75']:.1f}% DD")
+    print(f"  90% of runs stay under: {mc_results['dd_percentile_90']:.1f}% DD")
+    print(f"  95% of runs stay under: {mc_results['dd_percentile_95']:.1f}% DD")
+    print(f"  99% of runs stay under: {mc_results['dd_percentile_99']:.1f}% DD")
+    print()
+    print(f"*** STRATEGY BROKEN THRESHOLD: {mc_results['strategy_broken_threshold']:.1f}% DD ***")
+    print(f"    (If you hit this DD live, strategy may be dead)")
     print("=" * 60)
     
     # Save results
